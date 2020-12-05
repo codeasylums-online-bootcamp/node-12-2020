@@ -1,8 +1,7 @@
 const express = require('express')
 const router = express.Router()
 
-const userID = require('../controllers/users').userID
-const userHome = require('../controllers/users').userHome
+const {userID, userHome} = require('../controllers/users')
 
 // /user/abc -> /abc
 router.get('/',userHome) // path = "/"
