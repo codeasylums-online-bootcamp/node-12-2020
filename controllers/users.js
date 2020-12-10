@@ -1,4 +1,12 @@
-const {createUserDB,getAllUsersDB,getUserDB,deleteUserDB,updateUserDB} = require('../models/users/storage')
+const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
+
+const {createUserDB,getAllUsersDB,getUserDB,deleteUserDB,updateUserDB,getUserFromEmail} = require('../models/users/storage')
+
+const generateHash = (password) => {
+    const hash = bcrypt.hashSync(password, 10)
+    return hash
+}
 
 const createUser = async(req, res) => {
     const {name, email, password, confPassword} = req.body
@@ -13,7 +21,8 @@ const createUser = async(req, res) => {
         res.json({msg: "invalid password and confirm password"}).status(400)
     }
     else{
-        const data = await createUserDB({name,email,password,confPassword})
+        const hashedPassword = generateHash(password)
+        const data = await createUserDB({name,email,password:hashedPassword,confPassword})
         let status = 201
         if(data.err){
             status = 400
@@ -65,5 +74,40 @@ const updateUser = async(req,res) => {
     res.json(data).status(status)
 }
 
+const login = async(req, res) => {
+    const {email, password} = req.body
 
-module.exports = {createUser,getAllUsers,getUser,deleteUser,updateUser}
+    if(!email || !password){
+        res.json({err:"Email or Password Empty"}).status(400)
+    }
+    else{
+        // username exists or not
+        const data = await(getUserFromEmail(email))
+        //if username exists then compare password
+        // console.log(data)
+        if(data.err){
+            res.json({err:err}).status(500)
+        }
+        else{
+            const hash = data.user ? data.user.password : ""
+            if(bcrypt.compareSync(password,hash)){
+                const secret = process.env.SECRET_KEY
+                // console.log(secret)
+                jwt.sign({id:data.user._id},secret, { algorithm: 'HS256'}, (err, token)=>{
+                    if(err){
+                        res.json({err:err}).status(500)
+                    }
+                    else{
+                        res.json({token:token}).status(200)
+                    }
+                })
+            }
+            else{
+                res.json({msg:"incorrect password"}).status(401)
+            }
+        }
+        //if correct password then return success else failure
+    }
+}
+
+module.exports = {createUser,getAllUsers,getUser,deleteUser,updateUser, login}
